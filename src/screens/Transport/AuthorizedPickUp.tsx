@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   ScrollView,
-
 } from 'react-native';
 import React, {useCallback, useEffect, useContext} from 'react';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -13,6 +12,7 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import transportAPI from '../../api/transport';
 import {ParentContext} from '../../utils/context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function AuthorizedPickUp() {
   const {state, dispatch}: any = useContext(ParentContext);
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -27,11 +27,16 @@ export default function AuthorizedPickUp() {
   const get = useCallback(() => {
     (async () => {
       try {
+        const res_ = await AsyncStorage.getItem('authorizedPickup');
+
+        if (res_) {
+          setData(JSON.parse(res_));
+        }
         const res = await transportAPI.getAuthorized(
           state.main.profile.students[0].person.id,
         );
         setData(res.data);
-
+        AsyncStorage.setItem('authorizedPickup', JSON.stringify(res.data));
         setRefreshing(false);
         if (route.params) {
           setData((prev: any) => {

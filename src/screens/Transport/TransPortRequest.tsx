@@ -24,10 +24,11 @@ import {GooglePlacesAutocomplete} from 'react-native-google-places-autocomplete'
 import transportAPI from '../../api/transport';
 import {useRoute} from '@react-navigation/native';
 import * as Yup from 'yup';
-import {Field, Formik} from 'formik';
+import {Field, Formik, useFormikContext} from 'formik';
 import {ParentContext} from '../../utils/context';
 import LoaderModal from '../../components/LoaderModal';
 import MapViewDirections from 'react-native-maps-directions';
+import generalAPI from '../../api/general';
 export default function TransPortRequest() {
   const [showBottomSheetCurrent, setShowBottomSheetCurrent] = useState(false);
   const {state, dispatch}: any = useContext(ParentContext);
@@ -44,6 +45,7 @@ export default function TransPortRequest() {
   const [address, setAddress] = useState('');
   const mapRef: any = React.useRef(null);
   const bottomSheetRef: any = React.useRef(null);
+  const [schoolAddress, setSchoolAddress] = useState('');
   const [location, setLocation]: any = useState({
     latitude: 0,
     longitude: 0,
@@ -51,6 +53,10 @@ export default function TransPortRequest() {
   const [schoolLocation, setSchoolLocation]: any = useState({
     latitude: 0,
     longitude: 0,
+  });
+  const [mapDelta, setMapDelta]: any = useState({
+    x: 0.1,
+    y: 0.1,
   });
   const validationSchema = Yup.object().shape({
     address: Yup.string().trim().required('Location is required.'),
@@ -61,11 +67,12 @@ export default function TransPortRequest() {
     address: '',
   };
   let postReq: any[] = [];
+  const [regionChange, setRegionChange] = useState(false);
   const handleConvert = async () => {
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-          '2A, Jalan Stesen Sentral 2, Q Sentral @ Kuala Lumpur Sentral',
+          `${schoolAddress}`,
         )}&key=AIzaSyA0uuKpQZAhTm16dBIln-me0ug9sBvP_LQ`,
       );
 
@@ -76,7 +83,7 @@ export default function TransPortRequest() {
       const data = await response.json();
       if (data.results.length > 0) {
         const {lat, lng} = data.results[0].geometry.location;
-        console.log(lat, lng);
+
         setSchoolLocation({
           latitude: lat,
           longitude: lng,
@@ -104,42 +111,52 @@ export default function TransPortRequest() {
       console.error(error);
     }
   };
+  useEffect(() => {}, []);
   useEffect(() => {
-    Geolocation.getCurrentPosition(
-      (location: any) =>
-        setLocation({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        }),
-      error => {
-        console.log(error);
-      },
-      {enableHighAccuracy: true},
-    );
+    (async () => {
+      Geolocation.getCurrentPosition(
+        (location: any) =>
+          setLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          }),
+        error => {
+          console.log(error);
+        },
+        {enableHighAccuracy: true},
+      );
+      var arrId: any = [];
+      route.params.stdArr.map((item: any, index: number) => {
+        if (item.selected) {
+          arrId.push(item.id);
+        }
+      });
+      const res = await generalAPI.getSchool();
+      console.log(res);
+      setSchoolAddress(
+        res.data.address_1 +
+          ',' +
+          res.data.address_2 +
+          ',' +
+          res.data.city +
+          ',' +
+          res.data.country,
+      );
+    })();
   }, []);
   useEffect(() => {
-    handleConvert();
-    getAddressFromApi(location.latitude, location.longitude);
+    (async () => {
+      await handleConvert();
+      await getAddressFromApi(location.latitude, location.longitude);
+    })();
+
     mapRef.current.animateToRegion({
       latitude: location?.latitude,
       longitude: location?.longitude,
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
     });
-  }, [location]);
-  useEffect(() => {
-    var arrId: any = [];
-    route.params.stdArr.map((item: any, index: number) => {
-      if (item.selected) {
-        arrId.push(item.id);
-      }
-    });
-    postReq.push({
-      personId: arrId,
-      date: format(new Date(date), 'yyyy-MM-dd'),
-      address: address,
-    });
-  }, [address, date]);
+  }, [location, schoolAddress]);
 
   const handleSubmit = async () => {
     try {
@@ -180,11 +197,22 @@ export default function TransPortRequest() {
                 showsUserLocation
                 followsUserLocation
                 style={{width: '100%', height: '100%'}}
-                initialRegion={{
+                region={{
                   latitude: location?.latitude,
                   longitude: location?.longitude,
-                  latitudeDelta: 0.0922,
-                  longitudeDelta: 0.0421,
+                  latitudeDelta: mapDelta.x,
+                  longitudeDelta: mapDelta.y,
+                }}
+                onRegionChangeComplete={e => {
+                  setMapDelta({
+                    x: e.latitudeDelta,
+                    y: e.longitudeDelta,
+                  });
+                  setLocation({
+                    latitude: e.latitude,
+                    longitude: e.longitude,
+                  });
+                  setRegionChange(false);
                 }}>
                 <MapViewDirections
                   origin={{
@@ -199,6 +227,7 @@ export default function TransPortRequest() {
                   strokeColor="#4ade80"
                   strokeWidth={10}
                 />
+
                 <Marker
                   draggable
                   coordinate={location}
@@ -244,6 +273,9 @@ export default function TransPortRequest() {
                             }: any) => (
                               <View className="w-full">
                                 <TextInput
+                                  onChangeText={e => {
+                                    setAddress(e);
+                                  }}
                                   value={address}
                                   onPressIn={() => setModalVisible(true)}
                                   style={{
@@ -305,6 +337,9 @@ export default function TransPortRequest() {
                             }: any) => (
                               <View className="w-full">
                                 <TextInput
+                                  onChangeText={e => {
+                                    setDate(e);
+                                  }}
                                   onPressIn={() => setOpenDate(true)}
                                   style={{
                                     marginHorizontal: 2,
@@ -480,7 +515,9 @@ export default function TransPortRequest() {
           </View>
           <TouchableOpacity
             onPress={() => {
-              navigation.navigate('ApplyTransport', {upcoming: postReq[0]});
+              navigation.navigate('ApplyTransport', {
+                showBottomSheetCurrent: true,
+              });
             }}
             className="bg-green-500 flex items-center w-full py-1.5  rounded-md">
             <Text className="text-xl font-semibold text-white">Done</Text>

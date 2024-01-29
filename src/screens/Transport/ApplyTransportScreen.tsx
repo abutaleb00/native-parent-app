@@ -27,9 +27,10 @@ const Tabs = () => {
   const [data_, setData_]: any[] = useState([]);
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [loading, setLoading] = useState(false);
-  if (route.params) {
-    data_.push(route.params.upcoming);
-  }
+  const [reload,setReload] = useState(false);
+ 
+ 
+  console.log(route.params)
   const [refreshing, setRefreshing] = React.useState(false);
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -54,8 +55,18 @@ const Tabs = () => {
     }
   }
   useEffect(() => {
+    if (route.params) {
+      if(route.params.upcoming){
+      data_.push(route.params.upcoming);}
+      if(route.params.showBottomSheetCurrent){
+  setReload(!reload)
+      }
+    }
     getData()
-  }, []);
+  }, [route.params]);
+  useEffect(()=>{
+getData();
+  },[reload])
   const UpComingTab = () => {
     return (
       <>

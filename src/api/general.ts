@@ -7,6 +7,10 @@ const getProfile = async (): Promise<any> => {
   return await apiHandler.get('/app/profile');
 };
 
+const getSchool = async (): Promise<any> => {
+  return await apiHandler.get('/settings/school');
+};
+
 const postAppreciation = async (data: any) => {
   return await apiHandler.post('app/appreciation', data);
 };
@@ -71,6 +75,7 @@ const generalAPI = {
   getGallery,
   submitMedia,
   postImage,
+  getSchool
 };
 
 export default generalAPI;
